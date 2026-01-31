@@ -54,10 +54,10 @@ export interface Player {
   stats: PlayerStats;
   marketValue: number;
   salary: number;
-  reputation: number; // 0 - 100
+  reputation: number;
   xp: number;
   level: number;
-  currentStamina: number; // 0 - 100
+  currentStamina: number;
   injuryDays: number;
 }
 
@@ -68,8 +68,8 @@ export interface Club {
   league: string;
   tier: number;
   budget: number;
-  facilities: number; // 1-5
-  reputation: number; // 0-100
+  facilities: number;
+  reputation: number;
   colors: { primary: string; secondary: string };
 }
 
@@ -84,6 +84,17 @@ export interface Message {
 }
 
 export type CompetitionType = 'LEAGUE' | 'CUP' | 'CONTINENTAL' | 'INTERNATIONAL';
+
+export interface LeagueTableRow {
+  clubId: string;
+  points: number;
+  played: number;
+  won: number;
+  drawn: number;
+  lost: number;
+  goalsFor: number;
+  goalsAgainst: number;
+}
 
 export interface GameState {
   player: Player;
@@ -101,6 +112,7 @@ export interface GameState {
   isMatchDay: boolean;
   nextMatchOpponent?: string;
   nextMatchCompetition: CompetitionType;
-  leagueTable: Array<{ clubId: string; points: number; played: number }>;
+  leagueTable: LeagueTableRow[];
   isBenched: boolean;
+  isIntlCallup: boolean;
 }

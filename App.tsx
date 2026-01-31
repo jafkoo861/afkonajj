@@ -104,6 +104,38 @@ const App: React.FC = () => {
     setIsCreating(false);
   };
 
+  const processProgression = (p: Player, xpGain: number): Player => {
+    let newXp = p.xp + xpGain;
+    let newLevel = p.level;
+    let newOvr = p.ovr;
+    let newAttrs = { ...p.attributes };
+
+    while (newXp >= 1000 * newLevel) {
+      newXp -= 1000 * newLevel;
+      newLevel += 1;
+      // Chance to increase OVR on level up
+      if (newOvr < p.potential) {
+        newOvr += 1;
+      }
+      
+      // Increase random attributes
+      Object.keys(newAttrs).forEach(k => { 
+        if (Math.random() > 0.4) {
+          (newAttrs as any)[k] = Math.min(99, (newAttrs as any)[k] + 1);
+        }
+      });
+    }
+
+    return { 
+      ...p, 
+      xp: newXp, 
+      level: newLevel, 
+      ovr: newOvr, 
+      attributes: newAttrs,
+      marketValue: calculateMarketValue({ ...p, ovr: newOvr }) 
+    };
+  };
+
   const handleAdvanceDay = () => {
     if (!gameState) return;
     
@@ -170,35 +202,17 @@ const App: React.FC = () => {
     if (!gameState || gameState.player.currentStamina < 30) return;
     const p = gameState.player;
     const drain = type === 'LIGHT' ? 15 : 40;
-    const gain = type === 'LIGHT' ? 250 : 750; // Increased XP for faster progress
-    const risk = type === 'INTENSE' ? 0.05 : 0.005; // Reduced risk
-
-    let newXp = p.xp + gain;
-    let newLevel = p.level;
-    let newOvr = p.ovr;
-    let newAttrs = { ...p.attributes };
-
-    if (newXp >= 1000 * p.level) {
-      newXp -= 1000 * p.level;
-      newLevel += 1;
-      newOvr = Math.min(p.potential, p.ovr + 1);
-      Object.keys(newAttrs).forEach(k => { 
-        if (Math.random() > 0.3) {
-          (newAttrs as any)[k] = Math.min(99, (newAttrs as any)[k] + 1);
-        }
-      });
-    }
+    const gain = type === 'LIGHT' ? 300 : 850; 
+    const risk = type === 'INTENSE' ? 0.05 : 0.005;
 
     const isInjured = Math.random() < risk;
+    const progressedPlayer = processProgression(p, gain);
+    
     const nextState = {
       ...gameState,
       player: { 
-        ...p, 
-        xp: newXp, 
-        level: newLevel, 
-        ovr: newOvr, 
-        attributes: newAttrs, 
-        currentStamina: p.currentStamina - drain, 
+        ...progressedPlayer,
+        currentStamina: Math.max(0, p.currentStamina - drain), 
         injuryDays: isInjured ? 7 : p.injuryDays 
       }
     };
@@ -229,8 +243,12 @@ const App: React.FC = () => {
       return row;
     });
 
+    // Award XP based on match rating
+    const matchXpGain = Math.round(result.rating * 50); // E.g. 8.0 rating = 400 XP
+    const progressedPlayer = processProgression(gameState.player, matchXpGain);
+
     const updatedPlayer = {
-      ...gameState.player,
+      ...progressedPlayer,
       stats: {
         ...gameState.player.stats,
         goals: gameState.player.stats.goals + result.goals,
@@ -238,7 +256,8 @@ const App: React.FC = () => {
         appearances: gameState.player.stats.appearances + 1,
         avgRating: (gameState.player.stats.avgRating * gameState.player.stats.appearances + result.rating) / (gameState.player.stats.appearances + 1)
       },
-      currentStamina: Math.max(0, gameState.player.currentStamina - 45)
+      currentStamina: Math.max(0, gameState.player.currentStamina - 45),
+      reputation: gameState.player.reputation + (result.win ? 1.5 : result.rating > 7.5 ? 0.5 : 0)
     };
 
     const nextState = { ...gameState, player: updatedPlayer, leagueTable: newLeagueTable, isMatchDay: false, nextMatchOpponent: undefined };
@@ -523,7 +542,7 @@ const App: React.FC = () => {
                 </div>
                 <div className="bg-black/30 p-4 rounded-2xl border border-zinc-800/50">
                   <div className="text-[9px] font-black uppercase text-zinc-500 mb-1">XP Gain</div>
-                  <div className="font-black text-green-500">+250</div>
+                  <div className="font-black text-green-500">+300</div>
                 </div>
               </div>
               <button 
@@ -548,7 +567,7 @@ const App: React.FC = () => {
                 </div>
                 <div className="bg-black/30 p-4 rounded-2xl border border-zinc-800/50">
                   <div className="text-[9px] font-black uppercase text-zinc-500 mb-1">XP Gain</div>
-                  <div className="font-black text-yellow-500">+750</div>
+                  <div className="font-black text-yellow-500">+850</div>
                 </div>
               </div>
               <button 

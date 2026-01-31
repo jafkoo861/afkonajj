@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Player, Position, Club } from '../../types';
 import { STARTING_CLUBS } from '../../constants';
-import { Target, Zap, Shield, MoveHorizontal, MousePointer2 } from 'lucide-react';
+import { Target, Zap, Shield, MoveHorizontal, MousePointer2, Trophy, Frown, MinusCircle } from 'lucide-react';
 
 interface MatchEngineProps {
   player: Player;
@@ -50,18 +50,19 @@ export const MatchEngine: React.FC<MatchEngineProps> = ({ player, opponent, onFi
       // Realistic AI Score Logic
       if (opponentClub) {
         const repGap = opponentClub.reputation - playerClubRep;
-        const advantageProb = Math.max(0, repGap / 250);
-        if (Math.random() < 0.08 + advantageProb) {
+        // Reduced AI advantage slightly for "easier" overall feel
+        const advantageProb = Math.max(0, repGap / 300);
+        if (Math.random() < 0.07 + advantageProb) {
           setScore(s => ({ ...s, away: s.away + 1 }));
         }
-        if (Math.random() < 0.05) {
+        if (Math.random() < 0.06) {
            setScore(s => ({ ...s, home: s.home + 1 }));
         }
       }
 
       // Trigger Player Event
       const roll = Math.random();
-      if (roll < 0.35) {
+      if (roll < 0.4) { // Slightly increased event frequency for more player impact
         const eventPool: EventType[] = ['SHOOTING', 'PASSING', 'DRIBBLING', 'TACKLE'];
         const selected = eventPool[Math.floor(Math.random() * eventPool.length)];
         startMiniGame(selected);
@@ -79,7 +80,8 @@ export const MatchEngine: React.FC<MatchEngineProps> = ({ player, opponent, onFi
         setSliderPos(prev => {
           if (prev >= 100) dir = -1;
           if (prev <= 0) dir = 1;
-          return prev + (dir * 5);
+          // Slower slider speed for easier timing (was 5)
+          return prev + (dir * 3.5);
         });
       }, 20);
     }
@@ -89,7 +91,7 @@ export const MatchEngine: React.FC<MatchEngineProps> = ({ player, opponent, onFi
     }
 
     if (type === 'PASSING') {
-      setTargetPos({ x: 20 + Math.random() * 60, y: 20 + Math.random() * 40 });
+      setTargetPos({ x: 25 + Math.random() * 50, y: 25 + Math.random() * 30 });
     }
   };
 
@@ -99,12 +101,11 @@ export const MatchEngine: React.FC<MatchEngineProps> = ({ player, opponent, onFi
     let success = false;
     if (currentEvent === 'TACKLE') {
       window.clearInterval(sliderInterval.current!);
-      // Target is 45-55 range
-      success = sliderPos >= 40 && sliderPos <= 60;
+      // Target window widened (was 40-60)
+      success = sliderPos >= 30 && sliderPos <= 70;
     } else if (currentEvent === 'DRIBBLING') {
       success = input === activeSide;
     } else if (currentEvent === 'SHOOTING' || currentEvent === 'PASSING') {
-      // Handled by swipe or specific click
       success = input === true;
     }
 
@@ -121,7 +122,8 @@ export const MatchEngine: React.FC<MatchEngineProps> = ({ player, opponent, onFi
           setPlayerStats(s => ({ ...s, goals: s.goals + 1, rating: Math.min(10, s.rating + 1.2) }));
           setPhase('CELEBRATION');
         } else if (currentEvent === 'PASSING') {
-          if (Math.random() > 0.5) {
+          // Higher assist chance (was 0.5)
+          if (Math.random() > 0.4) {
             setScore(s => ({ ...s, home: s.home + 1 }));
             setPlayerStats(s => ({ ...s, assists: s.assists + 1, rating: Math.min(10, s.rating + 1.0) }));
             setPhase('CELEBRATION');
@@ -134,9 +136,10 @@ export const MatchEngine: React.FC<MatchEngineProps> = ({ player, opponent, onFi
           setPlayerStats(s => ({ ...s, rating: Math.min(10, s.rating + 0.8) }));
         }
       } else {
-        setPlayerStats(s => ({ ...s, rating: Math.max(3.5, s.rating - 0.4) }));
+        // Less harsh penalty for missing
+        setPlayerStats(s => ({ ...s, rating: Math.max(4.0, s.rating - 0.2) }));
         setPhase('FAILURE');
-        setTimeout(() => setPhase('EVENT'), 1000);
+        setTimeout(() => setPhase('EVENT'), 800);
       }
 
       if (phase !== 'CELEBRATION' || !success) {
@@ -153,32 +156,46 @@ export const MatchEngine: React.FC<MatchEngineProps> = ({ player, opponent, onFi
           <Zap size={48} className="text-black" />
         </div>
         <h1 className="text-6xl font-black mb-4 italic uppercase tracking-tighter">VERSUS {opponent}</h1>
-        <p className="text-zinc-500 font-bold uppercase tracking-widest animate-pulse">Pre-Match Warmup...</p>
+        <p className="text-zinc-500 font-bold uppercase tracking-widest animate-pulse">Match Kick-off imminent...</p>
       </div>
     );
   }
 
   if (phase === 'RESULT') {
+    const isWin = score.home > score.away;
+    const isDraw = score.home === score.away;
+    const resultColor = isWin ? 'text-green-500' : isDraw ? 'text-zinc-400' : 'text-red-500';
+    const ResultIcon = isWin ? Trophy : isDraw ? MinusCircle : Frown;
+    const resultText = isWin ? 'VICTORY' : isDraw ? 'DRAW' : 'DEFEAT';
+
     return (
-      <div className="fixed inset-0 z-50 bg-zinc-950 flex flex-col items-center justify-center p-8 text-center">
-        <h2 className="text-2xl font-bold mb-2 uppercase opacity-40 italic tracking-widest">Full Time whistle</h2>
-        <div className="text-9xl font-black mb-8 italic text-yellow-500 tracking-tighter drop-shadow-[0_0_30px_rgba(234,179,8,0.3)]">{score.home} - {score.away}</div>
+      <div className="fixed inset-0 z-50 bg-zinc-950 flex flex-col items-center justify-center p-8 text-center overflow-y-auto">
+        <div className={`mb-4 flex flex-col items-center animate-in zoom-in duration-500`}>
+          <ResultIcon size={64} className={`${resultColor} mb-2`} />
+          <h2 className={`text-6xl font-black italic uppercase tracking-tighter ${resultColor}`}>{resultText}</h2>
+        </div>
+        
+        <div className="text-9xl font-black mb-8 italic text-white tracking-tighter drop-shadow-[0_0_30px_rgba(255,255,255,0.1)]">
+          {score.home} <span className="text-zinc-700">-</span> {score.away}
+        </div>
+        
         <div className="grid grid-cols-2 gap-6 mb-12 w-full max-w-lg">
             <div className="bg-zinc-900/50 border border-zinc-800 p-8 rounded-3xl">
                 <div className="text-xs text-zinc-500 font-black uppercase mb-1">Match Rating</div>
-                <div className="text-5xl font-black text-green-500 italic">{playerStats.rating.toFixed(1)}</div>
+                <div className="text-5xl font-black text-yellow-500 italic">{playerStats.rating.toFixed(1)}</div>
             </div>
             <div className="bg-zinc-900/50 border border-zinc-800 p-8 rounded-3xl">
-                <div className="text-xs text-zinc-500 font-black uppercase mb-1">Contribution</div>
-                <div className="text-3xl font-black text-white">{playerStats.goals} Goals</div>
-                <div className="text-3xl font-black text-blue-400">{playerStats.assists} Assists</div>
+                <div className="text-xs text-zinc-500 font-black uppercase mb-1">Your Impact</div>
+                <div className="text-2xl font-black text-white">{playerStats.goals} Goals</div>
+                <div className="text-2xl font-black text-blue-400">{playerStats.assists} Assists</div>
             </div>
         </div>
+        
         <button 
-          onClick={() => onFinish({ ...playerStats, win: score.home > score.away, score: `${score.home}-${score.away}` })}
+          onClick={() => onFinish({ ...playerStats, win: isWin, score: `${score.home}-${score.away}` })}
           className="bg-yellow-500 text-black px-16 py-5 rounded-2xl font-black uppercase italic tracking-tighter hover:bg-yellow-400 hover:scale-105 transition-all shadow-xl"
         >
-          Exit to Locker Room
+          Finish Match
         </button>
       </div>
     );
@@ -203,7 +220,7 @@ export const MatchEngine: React.FC<MatchEngineProps> = ({ player, opponent, onFi
         </div>
         
         <div className="flex flex-col items-center">
-            <div className="text-5xl font-black italic text-zinc-800 tracking-tighter mb-1">{timer}'</div>
+            <div className="text-5xl font-black italic text-white tracking-tighter mb-1 opacity-80">{timer}'</div>
             <div className="w-32 h-1 bg-zinc-900 rounded-full overflow-hidden">
                 <div className="h-full bg-yellow-500 transition-all duration-500" style={{ width: `${(timer/90)*100}%` }} />
             </div>
@@ -211,7 +228,7 @@ export const MatchEngine: React.FC<MatchEngineProps> = ({ player, opponent, onFi
 
         <div className="bg-zinc-900/90 backdrop-blur-md p-5 rounded-2xl border border-zinc-800 shadow-2xl text-right">
           <div className="text-4xl font-black text-yellow-500 italic drop-shadow-[0_0_10px_rgba(234,179,8,0.5)]">{playerStats.rating.toFixed(1)}</div>
-          <div className="text-[10px] text-zinc-500 font-black uppercase">Performance</div>
+          <div className="text-[10px] text-zinc-500 font-black uppercase">Rating</div>
         </div>
       </div>
 
@@ -220,105 +237,100 @@ export const MatchEngine: React.FC<MatchEngineProps> = ({ player, opponent, onFi
         {phase === 'CELEBRATION' && (
           <div className="text-center animate-in zoom-in duration-300">
             <h2 className="text-[12rem] font-black italic text-yellow-500 leading-none tracking-tighter drop-shadow-2xl">GOAL!</h2>
-            <div className="text-2xl font-black uppercase tracking-[0.5em] text-white/50">Masterful Play</div>
           </div>
         )}
 
         {phase === 'FAILURE' && (
           <div className="text-center animate-pulse">
             <h2 className="text-6xl font-black italic text-red-500 uppercase tracking-tighter">MISSED!</h2>
-            <p className="text-zinc-500 font-bold uppercase">Focus your next chance</p>
           </div>
         )}
 
         {currentEvent === 'SHOOTING' && phase === 'EVENT' && (
-          <div className="w-full h-full flex flex-col items-center justify-center space-y-8">
+          <div className="w-full h-full flex flex-col items-center justify-center space-y-8 animate-in fade-in duration-300">
             <div className="relative w-80 h-48 bg-zinc-900/50 rounded-2xl border-4 border-white/5 flex items-center justify-center group overflow-hidden">
-                <div className="absolute top-4 left-4 w-4 h-4 bg-red-500/20 rounded-full"></div>
-                <div className="absolute top-4 right-4 w-4 h-4 bg-red-500/20 rounded-full"></div>
-                <div className="w-16 h-16 bg-yellow-500 rounded-full flex items-center justify-center cursor-pointer shadow-[0_0_40px_rgba(234,179,8,0.4)] hover:scale-110 transition-transform active:scale-95" onClick={() => handleAction(true)}>
-                    <Target size={32} className="text-black" />
+                <div className="w-24 h-24 bg-yellow-500 rounded-full flex items-center justify-center cursor-pointer shadow-[0_0_60px_rgba(234,179,8,0.6)] hover:scale-110 transition-transform active:scale-90" onClick={() => handleAction(true)}>
+                    <Target size={48} className="text-black" />
                 </div>
             </div>
             <div className="text-center">
-                <h3 className="text-3xl font-black uppercase italic tracking-tighter">PRECISION STRIKE</h3>
-                <p className="text-zinc-500 font-bold uppercase text-xs">Tap the target to finish!</p>
+                <h3 className="text-4xl font-black uppercase italic tracking-tighter text-yellow-500">SHOOT!</h3>
+                <p className="text-zinc-500 font-bold uppercase text-xs">Tap the target now!</p>
             </div>
           </div>
         )}
 
         {currentEvent === 'TACKLE' && phase === 'EVENT' && (
-          <div className="w-full max-w-xl space-y-12">
-            <div className="relative w-full h-20 bg-zinc-900 rounded-2xl border border-zinc-800 p-2">
-                <div className="absolute inset-y-0 left-[45%] right-[45%] bg-green-500/30 rounded-lg flex items-center justify-center">
-                    <Shield size={24} className="text-green-500" />
+          <div className="w-full max-w-xl space-y-12 animate-in fade-in duration-300">
+            <div className="relative w-full h-24 bg-zinc-900 rounded-3xl border-2 border-zinc-800 p-2">
+                <div className="absolute inset-y-0 left-[30%] right-[30%] bg-green-500/20 rounded-2xl flex items-center justify-center border border-green-500/30">
+                    <Shield size={32} className="text-green-500/50" />
                 </div>
                 <div 
-                  className="absolute top-2 bottom-2 w-4 bg-white rounded-full shadow-lg transition-all duration-20"
+                  className="absolute top-2 bottom-2 w-6 bg-white rounded-full shadow-[0_0_20px_rgba(255,255,255,0.5)] transition-all duration-20"
                   style={{ left: `${sliderPos}%` }}
                 />
             </div>
             <div className="text-center">
-                <h3 className="text-3xl font-black uppercase italic tracking-tighter">TIMED TACKLE</h3>
-                <p className="text-zinc-500 font-bold uppercase text-xs mb-8">Stop the slider in the green zone!</p>
+                <h3 className="text-4xl font-black uppercase italic tracking-tighter text-blue-500">TACKLE!</h3>
+                <p className="text-zinc-500 font-bold uppercase text-xs mb-8">Stop in the wide green zone</p>
                 <button 
                   onClick={() => handleAction()}
-                  className="bg-white text-black px-12 py-4 rounded-xl font-black uppercase italic tracking-tighter hover:bg-zinc-200"
+                  className="bg-white text-black px-16 py-5 rounded-2xl font-black uppercase italic tracking-tighter hover:bg-zinc-200 active:scale-95 transition-all"
                 >
-                    COMMIT TACKLE
+                    INTERCEPT
                 </button>
             </div>
           </div>
         )}
 
         {currentEvent === 'DRIBBLING' && phase === 'EVENT' && (
-          <div className="w-full max-w-4xl grid grid-cols-2 gap-8 h-96">
+          <div className="w-full max-w-4xl grid grid-cols-2 gap-8 h-96 animate-in fade-in duration-300">
             <button 
                 onClick={() => handleAction('LEFT')}
-                className={`rounded-3xl border-4 transition-all flex flex-col items-center justify-center group ${activeSide === 'LEFT' ? 'bg-yellow-500/10 border-yellow-500/50 hover:bg-yellow-500/20' : 'bg-zinc-900 border-zinc-800 opacity-20'}`}
+                className={`rounded-3xl border-4 transition-all flex flex-col items-center justify-center group ${activeSide === 'LEFT' ? 'bg-yellow-500/10 border-yellow-500 shadow-[0_0_30px_rgba(234,179,8,0.2)]' : 'bg-zinc-950 border-zinc-900 opacity-10'}`}
             >
-                <Zap size={64} className={activeSide === 'LEFT' ? 'text-yellow-500 mb-4' : 'text-zinc-700 mb-4'} />
-                <span className="font-black italic uppercase tracking-tighter text-2xl">DODGE LEFT</span>
+                <Zap size={84} className={activeSide === 'LEFT' ? 'text-yellow-500 mb-4' : 'text-zinc-700 mb-4'} />
+                <span className="font-black italic uppercase tracking-tighter text-3xl">DODGE</span>
             </button>
             <button 
                 onClick={() => handleAction('RIGHT')}
-                className={`rounded-3xl border-4 transition-all flex flex-col items-center justify-center group ${activeSide === 'RIGHT' ? 'bg-yellow-500/10 border-yellow-500/50 hover:bg-yellow-500/20' : 'bg-zinc-900 border-zinc-800 opacity-20'}`}
+                className={`rounded-3xl border-4 transition-all flex flex-col items-center justify-center group ${activeSide === 'RIGHT' ? 'bg-yellow-500/10 border-yellow-500 shadow-[0_0_30px_rgba(234,179,8,0.2)]' : 'bg-zinc-950 border-zinc-900 opacity-10'}`}
             >
-                <Zap size={64} className={activeSide === 'RIGHT' ? 'text-yellow-500 mb-4' : 'text-zinc-700 mb-4'} />
-                <span className="font-black italic uppercase tracking-tighter text-2xl">DODGE RIGHT</span>
+                <Zap size={84} className={activeSide === 'RIGHT' ? 'text-yellow-500 mb-4' : 'text-zinc-700 mb-4'} />
+                <span className="font-black italic uppercase tracking-tighter text-3xl">DODGE</span>
             </button>
           </div>
         )}
 
         {currentEvent === 'PASSING' && phase === 'EVENT' && (
-          <div className="w-full h-full relative">
+          <div className="w-full h-full relative animate-in fade-in duration-300">
             <div className="text-center absolute top-10 w-full">
-                <h3 className="text-3xl font-black uppercase italic tracking-tighter">VISION PASS</h3>
-                <p className="text-zinc-500 font-bold uppercase text-xs">Find the teammate in space!</p>
+                <h3 className="text-4xl font-black uppercase italic tracking-tighter text-blue-400">VISION PASS</h3>
+                <p className="text-zinc-500 font-bold uppercase text-xs">Tap the player in space!</p>
             </div>
             <div 
-              className="absolute w-20 h-20 bg-blue-500/20 border-2 border-blue-500 rounded-full flex items-center justify-center cursor-pointer animate-pulse hover:bg-blue-500/40"
+              className="absolute w-28 h-28 bg-blue-500/20 border-4 border-blue-500 rounded-full flex items-center justify-center cursor-pointer animate-pulse hover:bg-blue-500/40"
               style={{ left: `${targetPos.x}%`, top: `${targetPos.y}%` }}
               onClick={() => handleAction(true)}
             >
-                <MoveHorizontal className="text-blue-500" />
+                <MoveHorizontal size={40} className="text-blue-500" />
             </div>
           </div>
         )}
 
         {!currentEvent && phase === 'EVENT' && (
           <div className="text-zinc-800 font-black text-4xl uppercase italic tracking-tighter animate-pulse flex items-center space-x-4">
-            <Zap /> <span>Reading the game...</span>
+            <Zap /> <span>Reading the play...</span>
           </div>
         )}
       </div>
 
       {/* Footer Info */}
       <div className="w-full flex justify-center pb-8">
-        <div className="flex space-x-12 opacity-30 text-[10px] font-black uppercase tracking-[0.3em]">
-            <div className="flex items-center"><Zap size={12} className="mr-2" /> Energy {player.attributes.stamina}</div>
-            <div className="flex items-center"><Target size={12} className="mr-2" /> Skill {player.ovr}</div>
-            <div className="flex items-center"><Shield size={12} className="mr-2" /> Form GOOD</div>
+        <div className="flex space-x-12 opacity-50 text-[12px] font-black uppercase tracking-[0.3em]">
+            <div className="flex items-center"><Zap size={14} className="mr-2 text-yellow-500" /> Stamina {Math.round(player.currentStamina)}%</div>
+            <div className="flex items-center"><Target size={14} className="mr-2 text-blue-500" /> Skill {player.ovr}</div>
         </div>
       </div>
     </div>
